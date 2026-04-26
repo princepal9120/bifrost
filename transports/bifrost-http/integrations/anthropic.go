@@ -204,7 +204,7 @@ func hasFastModeBetaHeader(headers map[string][]string) bool {
 }
 
 // filterVertexUnsupportedBetaHeaders removes beta headers that Vertex AI doesn't support.
-// Vertex AI doesn't support: structured-outputs, advanced-tool-use, prompt-caching-scope, mcp-client.
+// Vertex AI doesn't support: structured-outputs, advanced-tool-use, prompt-caching-scope, mcp-client, context-management.
 func filterVertexUnsupportedBetaHeaders(headers map[string][]string) map[string][]string {
 	var betaHeaderKey string
 	var betaHeaders []string
@@ -236,7 +236,8 @@ func filterVertexUnsupportedBetaHeaders(headers map[string][]string) map[string]
 					strings.HasPrefix(beta, anthropic.AnthropicMCPClientBetaHeaderPrefix) ||
 					strings.HasPrefix(beta, anthropic.AnthropicSkillsBetaHeaderPrefix) ||
 					strings.HasPrefix(beta, anthropic.AnthropicFastModeBetaHeaderPrefix) ||
-					strings.HasPrefix(beta, anthropic.AnthropicRedactThinkingBetaHeaderPrefix) {
+					strings.HasPrefix(beta, anthropic.AnthropicRedactThinkingBetaHeaderPrefix) ||
+					strings.HasPrefix(beta, anthropic.AnthropicContextManagementBetaHeaderPrefix) {
 					continue
 				}
 				filteredBetas = append(filteredBetas, beta)

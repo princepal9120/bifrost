@@ -474,6 +474,13 @@ func (provider *VertexProvider) ChatCompletion(ctx *schemas.BifrostContext, key 
 			return nil, providerUtils.NewBifrostOperationError(remapErr.Error(), nil)
 		}
 		jsonBody = remappedBody
+
+		// Strip unsupported body fields for Vertex — covers both structured and raw passthrough paths.
+		var stripErr error
+		jsonBody, stripErr = anthropic.StripUnsupportedFieldsFromRawBody(jsonBody, schemas.Vertex, request.Model)
+		if stripErr != nil {
+			return nil, providerUtils.NewBifrostOperationError(stripErr.Error(), nil)
+		}
 	}
 
 	// Auth query is used for fine-tuned models to pass the API key in the query string
@@ -755,6 +762,13 @@ func (provider *VertexProvider) ChatCompletionStream(ctx *schemas.BifrostContext
 			jsonData, remapErr = anthropic.RemapRawToolVersionsForProvider(jsonData, schemas.Vertex)
 			if remapErr != nil {
 				return nil, providerUtils.NewBifrostOperationError(remapErr.Error(), nil)
+			}
+
+			// Strip unsupported body fields for Vertex — covers both structured and raw passthrough paths.
+			var stripErr error
+			jsonData, stripErr = anthropic.StripUnsupportedFieldsFromRawBody(jsonData, schemas.Vertex, request.Model)
+			if stripErr != nil {
+				return nil, providerUtils.NewBifrostOperationError(stripErr.Error(), nil)
 			}
 		}
 

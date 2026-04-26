@@ -1048,6 +1048,7 @@ func TestFilterBetaHeadersForProvider(t *testing.T) {
 			AnthropicSkillsBetaHeader,
 			AnthropicFastModeBetaHeader,
 			AnthropicRedactThinkingBetaHeader,
+			AnthropicContextManagementBetaHeader,
 		}
 		for _, h := range unsupported {
 			result := FilterBetaHeadersForProvider([]string{h}, schemas.Vertex)
@@ -1061,7 +1062,6 @@ func TestFilterBetaHeadersForProvider(t *testing.T) {
 		supported := []string{
 			AnthropicComputerUseBetaHeader20251124,
 			AnthropicCompactionBetaHeader,
-			AnthropicContextManagementBetaHeader,
 			AnthropicInterleavedThinkingBetaHeader,
 			AnthropicContext1MBetaHeader,
 			AnthropicEagerInputStreamingBetaHeader,
@@ -1280,6 +1280,38 @@ func TestStripUnsupportedFieldsFromRawBody(t *testing.T) {
 		// Confirm non-scope cache_control fields are retained.
 		if !providerUtils.JSONFieldExists(result, "cache_control.ttl") {
 			t.Errorf("expected cache_control.ttl to survive, got: %s", string(result))
+		}
+	})
+
+	t.Run("vertex_strips_entire_context_management_field", func(t *testing.T) {
+		// Vertex rejects the context_management field entirely ("Extra inputs are not permitted").
+		// This covers compact edits (Compaction:true keeps the beta header but not the body field)
+		// and clear edits (ContextEditing:false).
+		for _, editType := range []string{
+			string(ContextManagementEditTypeCompact),
+			string(ContextManagementEditTypeClearToolUses),
+			string(ContextManagementEditTypeClearThinking),
+		} {
+			input := []byte(`{"model":"claude-sonnet-4-6","context_management":{"edits":[{"type":"` + editType + `"}]}}`)
+			result, err := StripUnsupportedFieldsFromRawBody(input, schemas.Vertex, "claude-sonnet-4-6")
+			if err != nil {
+				t.Fatalf("unexpected error for edit type %q: %v", editType, err)
+			}
+			if providerUtils.JSONFieldExists(result, "context_management") {
+				t.Errorf("expected context_management to be fully stripped for Vertex (edit type %q), got: %s", editType, string(result))
+			}
+		}
+	})
+
+	t.Run("anthropic_keeps_context_management_per_edit_type", func(t *testing.T) {
+		// Anthropic supports context_management; compact edits are kept, clear edits are also kept.
+		input := []byte(`{"model":"claude-sonnet-4-6","context_management":{"edits":[{"type":"` + string(ContextManagementEditTypeCompact) + `"},{"type":"` + string(ContextManagementEditTypeClearToolUses) + `"}]}}`)
+		result, err := StripUnsupportedFieldsFromRawBody(input, schemas.Anthropic, "claude-sonnet-4-6")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !providerUtils.JSONFieldExists(result, "context_management") {
+			t.Errorf("expected context_management to be kept for Anthropic, got: %s", string(result))
 		}
 	})
 

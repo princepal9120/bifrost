@@ -453,36 +453,44 @@ func StripUnsupportedFieldsFromRawBody(jsonBody []byte, provider schemas.ModelPr
 		}
 	}
 
-	// context_management.edits[] — gate per edit.type.
-	if editsResult := providerUtils.GetJSONField(jsonBody, "context_management.edits"); editsResult.Exists() && editsResult.IsArray() {
-		edits := editsResult.Array()
-		// Collect indices to drop (iterate forwards, delete in reverse).
-		dropIndices := []int{}
-		for i, edit := range edits {
-			editType := edit.Get("type").String()
-			keep := true
-			switch editType {
-			case string(ContextManagementEditTypeCompact):
-				keep = features.Compaction
-			case string(ContextManagementEditTypeClearToolUses), string(ContextManagementEditTypeClearThinking):
-				keep = features.ContextEditing
-			}
-			if !keep {
-				dropIndices = append(dropIndices, i)
-			}
-		}
-		if len(dropIndices) == len(edits) && len(edits) > 0 {
-			// All edits unsupported — drop the whole context_management.
+	// context_management — if the provider doesn't accept the field at all (e.g. Vertex),
+	// drop it entirely. Otherwise gate per edit.type.
+	if providerUtils.JSONFieldExists(jsonBody, "context_management") {
+		if !features.ContextManagementField {
 			jsonBody, err = providerUtils.DeleteJSONField(jsonBody, "context_management")
 			if err != nil {
 				return nil, fmt.Errorf("strip raw context_management: %w", err)
 			}
-		} else {
-			for i := len(dropIndices) - 1; i >= 0; i-- {
-				path := fmt.Sprintf("context_management.edits.%d", dropIndices[i])
-				jsonBody, err = providerUtils.DeleteJSONField(jsonBody, path)
+		} else if editsResult := providerUtils.GetJSONField(jsonBody, "context_management.edits"); editsResult.Exists() && editsResult.IsArray() {
+			edits := editsResult.Array()
+			// Collect indices to drop (iterate forwards, delete in reverse).
+			dropIndices := []int{}
+			for i, edit := range edits {
+				editType := edit.Get("type").String()
+				keep := true
+				switch editType {
+				case string(ContextManagementEditTypeCompact):
+					keep = features.Compaction
+				case string(ContextManagementEditTypeClearToolUses), string(ContextManagementEditTypeClearThinking):
+					keep = features.ContextEditing
+				}
+				if !keep {
+					dropIndices = append(dropIndices, i)
+				}
+			}
+			if len(dropIndices) == len(edits) && len(edits) > 0 {
+				// All edits unsupported — drop the whole context_management.
+				jsonBody, err = providerUtils.DeleteJSONField(jsonBody, "context_management")
 				if err != nil {
-					return nil, fmt.Errorf("strip raw context_management.edits[%d]: %w", dropIndices[i], err)
+					return nil, fmt.Errorf("strip raw context_management: %w", err)
+				}
+			} else {
+				for i := len(dropIndices) - 1; i >= 0; i-- {
+					path := fmt.Sprintf("context_management.edits.%d", dropIndices[i])
+					jsonBody, err = providerUtils.DeleteJSONField(jsonBody, path)
+					if err != nil {
+						return nil, fmt.Errorf("strip raw context_management.edits[%d]: %w", dropIndices[i], err)
+					}
 				}
 			}
 		}
